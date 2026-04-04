@@ -565,18 +565,19 @@ select.form-control {
 /* Dashboard Grid */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 24px;
-    padding: 24px;
+    padding: 32px;
 }
 
 /* Stat Cards */
 .stat-card {
-    min-height: 350px;
+    min-height: 400px;
 }
 
 .stat-card .card-body {
-    padding: 24px;
+    padding: 16px;
+    height: 320px;
     display: flex;
     align-items: center;
     justify-content: center;

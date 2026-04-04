@@ -91,6 +91,22 @@ const tariffTbody = document.getElementById('tariff-tbody');
 const btnAddRule = document.getElementById('btn-add-rule');
 const btnClearTariffs = document.getElementById('btn-clear-tariffs');
 
+// Función Global de Navegación
+const switchView = (viewName) => {
+    viewDashboard.style.display = viewName === 'dashboard' ? 'block' : 'none';
+    viewBudget.style.display = viewName === 'budget' ? 'block' : 'none';
+    viewConfig.style.display = viewName === 'config' ? 'block' : 'none';
+    viewHistory.style.display = viewName === 'history' ? 'block' : 'none';
+
+    navDashboard.classList.toggle('active', viewName === 'dashboard');
+    navBudget.classList.toggle('active', viewName === 'budget');
+    navConfig.classList.toggle('active', viewName === 'config');
+    navHistory.classList.toggle('active', viewName === 'history');
+
+    if (viewName === 'history') renderHistory();
+    if (viewName === 'dashboard') renderDashboard();
+};
+
 // Inicializar la App
 document.addEventListener('DOMContentLoaded', () => {
     loadLists();
@@ -311,26 +327,6 @@ function updateThemeIcon(theme, icon) {
     }
 }
 
-// Cambiar Vista
-function switchView(view) {
-    // Reset all
-    [navBudget, navConfig, navHistory].forEach(n => n.classList.remove('active'));
-    [viewBudget, viewConfig, viewHistory].forEach(v => v.style.display = 'none');
-
-    if (view === 'budget') {
-        navBudget.classList.add('active');
-        viewBudget.style.display = 'block';
-    } else if (view === 'config') {
-        navConfig.classList.add('active');
-        viewConfig.style.display = 'block';
-        renderConfigLists();
-        renderTariffTable();
-    } else if (view === 'history') {
-        navHistory.classList.add('active');
-        viewHistory.style.display = 'block';
-        renderHistory();
-    }
-}
 
 // ----------------------------------------------------
 // HISTORIAL DE PRESUPUESTOS
@@ -396,7 +392,7 @@ function renderHistory() {
     );
 
     if (filtered.length === 0) {
-        historyTbody.innerHTML = `<tr><td colspan="4" class="text-center" style="padding: 30px; color: #6b7280;">No se encontraron resultados.</td></tr>`;
+        historyTbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding: 30px; color: #6b7280;">No se encontraron resultados.</td></tr>`;
         paginationControls.style.display = 'none';
         return;
     }
@@ -1324,6 +1320,35 @@ window.deleteClient = function(index) {
 function renderDashboard() {
     if (typeof Chart === 'undefined') return;
 
+    const dashboardGrid = document.querySelector('.dashboard-grid');
+    if (budgetHistory.length === 0) {
+        dashboardGrid.innerHTML = `
+            <div style="grid-column: 1 / -1; padding: 60px; text-align: center; color: var(--color-text-muted);">
+                <i class="ph ph-chart-pie-slice" style="font-size: 4rem; opacity: 0.3; margin-bottom: 20px;"></i>
+                <h2>No hay suficientes datos</h2>
+                <p>Cree y guarde presupuestos para ver las estadísticas de su negocio aquí.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Restaurar estructura original si había mensaje de "No hay datos"
+    if (!document.getElementById('salesChart')) {
+        dashboardGrid.innerHTML = `
+            <section class="card stat-card">
+                <div class="card-header"><h3>Resumen de Ventas (Mensual)</h3></div>
+                <div class="card-body"><canvas id="salesChart"></canvas></div>
+            </section>
+            <section class="card stat-card">
+                <div class="card-header"><h3>Top 5 Clientes</h3></div>
+                <div class="card-body"><canvas id="clientsChart"></canvas></div>
+            </section>
+            <section class="card stat-card">
+                <div class="card-header"><h3>Distribución de Servicios</h3></div>
+                <div class="card-body"><canvas id="servicesChart"></canvas></div>
+            </section>
+        `;
+    }
     // 1. Datos para Ventas Mensuales
     const salesData = {};
     budgetHistory.forEach(h => {
