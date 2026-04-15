@@ -47,11 +47,18 @@ let salesChart = null;
 let clientsChart = null;
 let servicesChart = null;
 let budgetHistory = [];
+let clients = [];
+let historyStartDate = "";
+let historyEndDate = "";
+let taxName = "IVA";
+let taxPercent = 19;
+let legalNotes = "Válido por 15 días. Pago al contado.";
+
+// Variables de Estado de Navegación y Filtros
 let baseCurrency = "CLP";
 let historySearchQuery = "";
 let historyCurrentPage = 1;
-const historyItemsPerPage = 25;
-let clients = [];
+let historyItemsPerPage = 10;
 
 // Referencias al DOM - Navegación
 const navDashboard = document.getElementById('nav-dashboard');
@@ -93,18 +100,37 @@ const btnClearTariffs = document.getElementById('btn-clear-tariffs');
 
 // Función Global de Navegación
 const switchView = (viewName) => {
-    viewDashboard.style.display = viewName === 'dashboard' ? 'block' : 'none';
-    viewBudget.style.display = viewName === 'budget' ? 'block' : 'none';
-    viewConfig.style.display = viewName === 'config' ? 'block' : 'none';
-    viewHistory.style.display = viewName === 'history' ? 'block' : 'none';
+    const views = [
+        { name: 'dashboard', el: viewDashboard },
+        { name: 'budget', el: viewBudget },
+        { name: 'config', el: viewConfig },
+        { name: 'history', el: viewHistory }
+    ];
 
-    navDashboard.classList.toggle('active', viewName === 'dashboard');
-    navBudget.classList.toggle('active', viewName === 'budget');
-    navConfig.classList.toggle('active', viewName === 'config');
-    navHistory.classList.toggle('active', viewName === 'history');
+    views.forEach(v => {
+        if (v.el) {
+            v.el.style.display = v.name === viewName ? 'block' : 'none';
+            if (v.name === viewName) {
+                v.el.classList.remove('animate-view');
+                void v.el.offsetWidth; // Trigger reflow
+                v.el.classList.add('animate-view');
+            }
+        }
+    });
+
+    if (navDashboard) navDashboard.classList.toggle('active', viewName === 'dashboard');
+    if (navBudget) navBudget.classList.toggle('active', viewName === 'budget');
+    if (navConfig) navConfig.classList.toggle('active', viewName === 'config');
+    if (navHistory) navHistory.classList.toggle('active', viewName === 'history');
 
     if (viewName === 'history') renderHistory();
     if (viewName === 'dashboard') renderDashboard();
+    if (viewName === 'config') {
+        renderConfigLists();
+        renderTariffTable();
+        renderClients();
+    }
+    if (viewName === 'budget') renderTable();
 };
 
 // Inicializar la App
@@ -115,28 +141,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // Establecer fecha de hoy por defecto
     document.getElementById('budget-date').valueAsDate = new Date();
     
-    // Agregar primera fila por defecto
-    addRow();
+    // No agregar fila por defecto como se solicitó
 
     // Listeners - Navegación
     if (navDashboard) navDashboard.addEventListener('click', (e) => { e.preventDefault(); switchView('dashboard'); });
-    navBudget.addEventListener('click', (e) => { e.preventDefault(); switchView('budget'); });
-    navConfig.addEventListener('click', (e) => { e.preventDefault(); switchView('config'); });
-    navHistory.addEventListener('click', (e) => { e.preventDefault(); switchView('history'); });
+    if (navBudget) navBudget.addEventListener('click', (e) => { e.preventDefault(); switchView('budget'); });
+    if (navConfig) navConfig.addEventListener('click', (e) => { e.preventDefault(); switchView('config'); });
+    if (navHistory) navHistory.addEventListener('click', (e) => { e.preventDefault(); switchView('history'); });
 
     // Listeners - Presupuestos
-    btnAddRow.addEventListener('click', addRow);
-    btnExportExcel.addEventListener('click', () => { exportToExcel(); saveBudgetToHistory(); });
-    btnExportPdf.addEventListener('click', () => { exportToPdf(); saveBudgetToHistory(); });
+    if (btnAddRow) btnAddRow.addEventListener('click', addRow);
+    if (btnExportExcel) btnExportExcel.addEventListener('click', () => { exportToExcel(); saveBudgetToHistory(); });
+    if (btnExportPdf) btnExportPdf.addEventListener('click', () => { exportToPdf(); saveBudgetToHistory(); });
 
     // Listeners - Configuración Listas
-    btnAddService.addEventListener('click', addService);
-    btnAddSpecies.addEventListener('click', addSpecies);
-    btnAddDesc.addEventListener('click', addDesc);
+    if (btnAddService) btnAddService.addEventListener('click', addService);
+    if (btnAddSpecies) btnAddSpecies.addEventListener('click', addSpecies);
+    if (btnAddDesc) btnAddDesc.addEventListener('click', addDesc);
 
     // Listeners - Configuración Tarifas
-    btnAddRule.addEventListener('click', addTariffRule);
-    btnClearTariffs.addEventListener('click', () => {
+    if (btnAddRule) btnAddRule.addEventListener('click', addTariffRule);
+    if (btnClearTariffs) btnClearTariffs.addEventListener('click', () => {
         if(confirm('¿Seguro que desea eliminar todas las reglas de tarifas guardadas?')) {
             tariffRules = [];
             saveTariffRules();
@@ -144,26 +169,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Listeners - History
-    document.getElementById('btn-clear-history').addEventListener('click', clearHistory);
-
     fetchExchangeRate();
     initTheme();
     loadCompanyInfo();
     loadHistory();
     loadBaseCurrency();
     loadClients();
+    loadTaxSettings();
+    loadLegalNotes();
+    checkExpirations();
 
-    document.getElementById('btn-theme-toggle').addEventListener('click', toggleTheme);
+    const btnThemeToggle = document.getElementById('btn-theme-toggle');
+    if (btnThemeToggle) btnThemeToggle.addEventListener('click', toggleTheme);
     
     // Branding Listeners
-    document.getElementById('company-name').addEventListener('input', (e) => updateCompanyInfo('name', e.target.value));
-    document.getElementById('company-rut').addEventListener('input', (e) => updateCompanyInfo('rut', e.target.value));
-    document.getElementById('company-contact').addEventListener('input', (e) => updateCompanyInfo('contact', e.target.value));
-    document.getElementById('input-logo').addEventListener('change', handleLogoUpload);
+    const inputLogo = document.getElementById('input-logo');
+    const inputSignature = document.getElementById('input-signature');
+    if (document.getElementById('company-name')) document.getElementById('company-name').addEventListener('input', (e) => updateCompanyInfo('name', e.target.value));
+    if (document.getElementById('company-rut')) document.getElementById('company-rut').addEventListener('input', (e) => updateCompanyInfo('rut', e.target.value));
+    if (document.getElementById('company-contact')) document.getElementById('company-contact').addEventListener('input', (e) => updateCompanyInfo('contact', e.target.value));
+    if (inputLogo) inputLogo.addEventListener('change', handleLogoUpload);
+    if (inputSignature) inputSignature.addEventListener('change', handleSignatureUpload);
 
     // Currency Listener
-    document.getElementById('base-currency-select').addEventListener('change', (e) => {
+    const baseCurrencySelect = document.getElementById('base-currency-select');
+    if (baseCurrencySelect) baseCurrencySelect.addEventListener('change', (e) => {
         baseCurrency = e.target.value;
         localStorage.setItem('protarifas_base_currency', baseCurrency);
         renderTable(); 
@@ -171,20 +201,38 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // History Listeners
-    document.getElementById('history-search').addEventListener('input', (e) => {
+    const historySearch = document.getElementById('history-search');
+    const historyDateFrom = document.getElementById('history-date-from');
+    const historyDateTo = document.getElementById('history-date-to');
+    const btnPrevPage = document.getElementById('btn-prev-page');
+    const btnNextPage = document.getElementById('btn-next-page');
+
+    if (historySearch) historySearch.addEventListener('input', (e) => {
         historySearchQuery = e.target.value.toLowerCase();
         historyCurrentPage = 1;
         renderHistory();
     });
 
-    document.getElementById('btn-prev-page').addEventListener('click', () => {
+    if (historyDateFrom) historyDateFrom.addEventListener('change', (e) => {
+        historyStartDate = e.target.value;
+        historyCurrentPage = 1;
+        renderHistory();
+    });
+
+    if (historyDateTo) historyDateTo.addEventListener('change', (e) => {
+        historyEndDate = e.target.value;
+        historyCurrentPage = 1;
+        renderHistory();
+    });
+
+    if (btnPrevPage) btnPrevPage.addEventListener('click', () => {
         if (historyCurrentPage > 1) {
             historyCurrentPage--;
             renderHistory();
         }
     });
 
-    document.getElementById('btn-next-page').addEventListener('click', () => {
+    if (btnNextPage) btnNextPage.addEventListener('click', () => {
         const filtered = budgetHistory.filter(h => h.client.toLowerCase().includes(historySearchQuery));
         const totalPages = Math.ceil(filtered.length / historyItemsPerPage);
         if (historyCurrentPage < totalPages) {
@@ -193,20 +241,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.getElementById('btn-clear-history').addEventListener('click', clearHistory);
+    const btnClearHistory = document.getElementById('btn-clear-history');
+    if (btnClearHistory) btnClearHistory.addEventListener('click', clearHistory);
 
     // New Budget Listener
-    document.getElementById('btn-new-budget').addEventListener('click', newBudget);
-
-    // Signature Listener
-    document.getElementById('input-signature').addEventListener('change', handleSignatureUpload);
+    const btnNewBudget = document.getElementById('btn-new-budget');
+    if (btnNewBudget) btnNewBudget.addEventListener('click', newBudget);
 
     // Backup Listeners
-    document.getElementById('btn-export-backup').addEventListener('click', exportUserData);
-    document.getElementById('input-import-backup').addEventListener('change', importUserData);
+    const btnExportBackup = document.getElementById('btn-export-backup');
+    const inputImportBackup = document.getElementById('input-import-backup');
+    if (btnExportBackup) btnExportBackup.addEventListener('click', exportUserData);
+    if (inputImportBackup) inputImportBackup.addEventListener('change', importUserData);
 
     // Global History Export
-    document.getElementById('btn-export-all-history').addEventListener('click', exportAllHistoryToExcel);
+    const btnExportAllHistory = document.getElementById('btn-export-all-history');
+    const btnExportHistoryPdf = document.getElementById('btn-export-history-pdf');
+    if (btnExportAllHistory) btnExportAllHistory.addEventListener('click', exportAllHistoryToExcel);
+    if (btnExportHistoryPdf) btnExportHistoryPdf.addEventListener('click', exportHistoryToPdf);
+
+    // v4.0 New Listeners
+    const taxNameInput = document.getElementById('tax-name');
+    const taxPercentInput = document.getElementById('tax-percent');
+    const legalNotesInput = document.getElementById('legal-notes');
+    const btnAddClient = document.getElementById('btn-add-client');
+    const inputImportRules = document.getElementById('input-import-rules');
+
+    if (taxNameInput) taxNameInput.addEventListener('input', (e) => { taxName = e.target.value; saveTaxSettings(); updateSummary(); });
+    if (taxPercentInput) taxPercentInput.addEventListener('input', (e) => { taxPercent = parseFloat(e.target.value) || 0; saveTaxSettings(); updateSummary(); });
+    if (legalNotesInput) legalNotesInput.addEventListener('input', (e) => { legalNotes = e.target.value; saveLegalNotes(); });
+    if (btnAddClient) btnAddClient.addEventListener('click', addClient);
+    if (inputImportRules) inputImportRules.addEventListener('change', importRulesFromExcel);
+    if (inputImportRules) inputImportRules.addEventListener('change', importRulesFromExcel);
 });
 
 // ----------------------------------------------------
@@ -387,12 +453,15 @@ function renderHistory() {
     historyTbody.innerHTML = '';
 
     // 1. Filtrar
-    const filtered = budgetHistory.filter(h => 
-        h.client.toLowerCase().includes(historySearchQuery)
-    );
+    const filtered = budgetHistory.filter(h => {
+        const matchesClient = h.client.toLowerCase().includes(historySearchQuery);
+        const matchesFrom = !historyStartDate || h.date >= historyStartDate;
+        const matchesTo = !historyEndDate || h.date <= historyEndDate;
+        return matchesClient && matchesFrom && matchesTo;
+    });
 
     if (filtered.length === 0) {
-        historyTbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding: 30px; color: #6b7280;">No se encontraron resultados.</td></tr>`;
+        historyTbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding: 30px; color: #6b7280;">No se encontraron resultados para los filtros aplicados.</td></tr>`;
         paginationControls.style.display = 'none';
         return;
     }
@@ -406,8 +475,10 @@ function renderHistory() {
     const paginatedItems = filtered.slice(start, end);
 
     // 3. Renderizar filas
-    paginatedItems.forEach(entry => {
+    paginatedItems.forEach((entry, index) => {
         const tr = document.createElement('tr');
+        tr.classList.add('animate-row');
+        tr.style.animationDelay = `${index * 0.05}s`;
         tr.innerHTML = `
             <td>${entry.date}</td>
             <td>${entry.client}</td>
@@ -422,6 +493,12 @@ function renderHistory() {
                 </span>
             </td>
             <td class="text-center">
+                <button class="btn btn-outline btn-sm" onclick="exportHistoryEntryToPdf(${entry.id})" title="Exportar PDF" style="border-color: #ef4444; color: #ef4444;">
+                    <i class="ph ph-file-pdf"></i>
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="sendBudgetByEmailFromHistory(${entry.id})" title="Enviar por Correo" style="border-color: #6366f1; color: #6366f1;">
+                    <i class="ph ph-envelope"></i>
+                </button>
                 <button class="btn btn-outline btn-sm" onclick="loadBudgetFromHistory(${entry.id})" title="Cargar / Editar">
                     <i class="ph ph-folder-open"></i>
                 </button>
@@ -656,8 +733,10 @@ function renderTariffTable() {
         return;
     }
 
-    tariffRules.forEach(rule => {
+    tariffRules.forEach((rule, index) => {
         const tr = document.createElement('tr');
+        tr.classList.add('animate-row');
+        tr.style.animationDelay = `${index * 0.05}s`;
         tr.innerHTML = `
             <td>
                 <select class="form-control" onchange="updateTariffRule(${rule.id}, 'service', this.value)">
@@ -687,59 +766,6 @@ function renderTariffTable() {
         tariffTbody.appendChild(tr);
     });
 }
-
-// Función dinámica para formatear moneda según la base
-const formatCurrency = (value) => {
-    if (baseCurrency === "USD") {
-        return new Intl.NumberFormat('en-US', { 
-            style: 'currency', 
-            currency: 'USD',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2 
-        }).format(value);
-    } else {
-        return new Intl.NumberFormat('es-CL', { 
-            style: 'currency', 
-            currency: 'CLP',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2 
-        }).format(value);
-    }
-};
-
-// Función para el equivalente (la otra moneda)
-const formatAltCurrency = (value) => {
-    if (baseCurrency === "CLP") {
-        return new Intl.NumberFormat('en-US', { 
-            style: 'currency', 
-            currency: 'USD',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2 
-        }).format(value);
-    } else {
-        return new Intl.NumberFormat('es-CL', { 
-            style: 'currency', 
-            currency: 'CLP',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2 
-        }).format(value);
-    }
-};
-
-// Helper para USD fijo
-const formatUSD = (value) => {
-    return new Intl.NumberFormat('en-US', { 
-        style: 'currency', 
-        currency: 'USD',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2 
-    }).format(value);
-};
-
-// Crear opciones para Select
-const createSelectOptions = (optionsArray, selectedValue = "") => {
-    return optionsArray.map(opt => `<option value="${opt}" ${opt === selectedValue ? 'selected' : ''}>${opt}</option>`).join('');
-};
 
 // Obtener descripciones válidas según reglas tarifarias para un servicio y especie
 const getValidDescriptions = (service, species) => {
@@ -802,8 +828,10 @@ function renderTable() {
         return;
     }
 
-    budgetItems.forEach(item => {
+    budgetItems.forEach((item, index) => {
         const tr = document.createElement('tr');
+        tr.classList.add('animate-row');
+        tr.style.animationDelay = `${index * 0.05}s`;
         tr.innerHTML = `
             <td>
                 <select class="form-control" onchange="updateItem(${item.id}, 'service', this.value)">
@@ -826,7 +854,8 @@ function renderTable() {
             </td>
             <td>
                 <input type="number" class="form-control price-input" min="0" step="0.01" value="${item.price}" 
-                       onchange="updateItem(${item.id}, 'price', this.value)">
+                       readonly style="background-color: var(--color-bg-muted); cursor: not-allowed; opacity: 0.8;" 
+                       title="El precio se asigna automáticamente según las reglas en Configuración">
             </td>
             <td style="font-weight: 600;">
                 ${formatCurrency(item.total)}
@@ -920,11 +949,12 @@ function updateSummary() {
     summaryContent.innerHTML = html;
 
     // Calcular Impuestos y Total
-    const tax = globalTotal * 0.19; // IVA 19% Ejemplo Chile
-    const grandTotal = globalTotal + tax;
+    const taxValue = globalTotal * (taxPercent / 100);
+    const grandTotal = globalTotal + taxValue;
 
+    document.getElementById('tax-label').innerText = `${taxName} (${taxPercent}%):`;
     subtotalEl.innerText = formatCurrency(globalTotal);
-    taxEl.innerText = formatCurrency(tax);
+    taxEl.innerText = formatCurrency(taxValue);
     const grandTotalLabelEl = document.getElementById('grand-total-label');
     if (baseCurrency === "USD") {
         grandTotalLabelEl.innerText = "Total a Pagar en Dólares";
@@ -985,14 +1015,24 @@ function exportToExcel() {
 
 // Exportar a PDF usando jsPDF y autoTable
 function exportToPdf() {
-    if (budgetItems.length === 0) {
-        alert("Agregue servicios al presupuesto para exportar.");
+    const clientName = document.getElementById('client-name').value || "Cliente Sin Nombre";
+    const date = document.getElementById('budget-date').value;
+    generateBudgetPdf(clientName, date, budgetItems);
+}
+
+function exportHistoryEntryToPdf(id) {
+    const entry = budgetHistory.find(h => h.id === id);
+    if (!entry) return;
+    generateBudgetPdf(entry.client, entry.date, entry.items);
+}
+
+function generateBudgetPdf(clientName, date, items) {
+    if (!items || items.length === 0) {
+        alert("No hay servicios para exportar.");
         return;
     }
 
-    const clientName = document.getElementById('client-name').value || "Cliente Sin Nombre";
     const clientData = clients.find(c => c.name.toLowerCase() === clientName.toLowerCase());
-    const date = document.getElementById('budget-date').value;
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -1056,6 +1096,10 @@ function exportToPdf() {
         }
         if (clientData.phone) {
             doc.text(`Teléfono: ${clientData.phone}`, 14, offset);
+            offset += 5;
+        }
+        if (clientData.email) {
+            doc.text(`Correo: ${clientData.email}`, 14, offset);
         }
     }
 
@@ -1076,20 +1120,18 @@ function exportToPdf() {
 
     // Tasa de cambio eliminada de aquí (se mueve a notas abajo)
 
-    // --- TABLA DE SERVICIOS ---
-    const tableBody = budgetItems.map(item => [
+    const globalTotal = items.reduce((acc, item) => acc + item.total, 0);
+    const taxValue = globalTotal * (taxPercent / 100);
+    const grandTotal = globalTotal + taxValue;
+
+    const tableBody = items.map(item => [
         item.service,
         item.species,
         item.description,
-        item.quantity.toString(),
-        `$ ${item.price.toLocaleString('es-CL')}`,
-        `$ ${item.total.toLocaleString('es-CL')}`
+        item.quantity,
+        formatPrice(item.price),
+        formatCurrency(item.total)
     ]);
-
-    // Calcular Totales Globales
-    const globalTotal = budgetItems.reduce((acc, item) => acc + item.total, 0);
-    const tax = globalTotal * 0.19;
-    const grandTotal = globalTotal + tax;
 
     doc.autoTable({
         startY: 68,
@@ -1150,9 +1192,10 @@ function exportToPdf() {
     doc.text("Subtotal:", boxX + 6, finalY + 8);
     doc.text(`$ ${globalTotal.toLocaleString('es-CL')}`, boxX + boxWidth - 6, finalY + 8, { align: "right" });
     
-    // IVA
-    doc.text("IVA (19%):", boxX + 6, finalY + 16);
-    doc.text(`$ ${tax.toLocaleString('es-CL')}`, boxX + boxWidth - 6, finalY + 16, { align: "right" });
+    // IVA / TAX
+    const taxLabel = `${taxName} (${taxPercent}%):`;
+    doc.text(taxLabel, boxX + 6, finalY + 16);
+    doc.text(`$ ${taxValue.toLocaleString('es-CL')}`, boxX + boxWidth - 6, finalY + 16, { align: "right" });
     
     // Línea separadora
     doc.setDrawColor(209, 213, 219);
@@ -1196,19 +1239,11 @@ function exportToPdf() {
     doc.setFontSize(8);
     doc.setTextColor(107, 114, 128); // Gris
     doc.setFont("helvetica", "bold");
-    doc.text("Notas Importantes:", 14, notesY);
+    doc.text("Términos y Condiciones:", 14, notesY);
     
     doc.setFont("helvetica", "normal");
-    let currentNoteY = notesY + 5;
-    
-    // Tasa de cambio en las notas
-    if (currentUSD > 0) {
-        doc.text(`• Tasa de cambio aplicada en esta cotización: 1 USD = ${new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(currentUSD)} CLP`, 14, currentNoteY);
-        currentNoteY += 5;
-    }
-    
-    doc.text("• Presupuesto válido por 15 días corridos a partir de la fecha de emisión.", 14, currentNoteY);
-    currentNoteY += 5;
+    const splitNotes = doc.splitTextToSize(legalNotes, pageWidth - 100); // Dar espacio para la firma
+    doc.text(splitNotes, 14, notesY + 5);
 
     // --- FIRMA DIGITAL AL FINAL ---
     if (companyInfo.signature) {
@@ -1219,11 +1254,12 @@ function exportToPdf() {
             doc.text("Firma / Timbre Autorizado", pageWidth - 60 + 22.5, pageHeight - 32, { align: 'center' });
         } catch (e) { console.error("Error drawing signature on PDF", e); }
     }
-    doc.text("• Los valores indicados están sujetos a modificaciones según la demanda real del mercado.", 14, currentNoteY);
 
     // Guardar
     doc.save(`Presupuesto_${clientName.replace(/\s+/g, '_')}_${date}.pdf`);
 }
+
+window.exportHistoryEntryToPdf = exportHistoryEntryToPdf;
 
 // ----------------------------------------------------
 // GESTIÓN DE CLIENTES
@@ -1251,11 +1287,15 @@ function renderClients() {
 
     clients.forEach((c, index) => {
         const tr = document.createElement('tr');
+        tr.classList.add('animate-row');
+        tr.style.animationDelay = `${index * 0.05}s`;
         tr.innerHTML = `
             <td><strong>${c.name}</strong></td>
             <td>${c.rut || '-'}</td>
+            <td>${c.email || '-'}</td>
+            <td>${c.phone || '-'}</td>
             <td style="font-size: 0.85rem; color: var(--color-text-muted);">
-                ${c.phone || ''} ${c.address ? ' | ' + c.address : ''}
+                ${c.address || '-'}
             </td>
             <td class="text-center">
                 <button class="btn btn-danger btn-sm" onclick="deleteClient(${index})">
@@ -1282,6 +1322,7 @@ function addClient() {
     const nameInput = document.getElementById('new-client-name');
     const rutInput = document.getElementById('new-client-rut');
     const phoneInput = document.getElementById('new-client-phone');
+    const emailInput = document.getElementById('new-client-email');
     const addrInput = document.getElementById('new-client-address');
 
     if (!nameInput.value.trim()) {
@@ -1293,6 +1334,7 @@ function addClient() {
         name: nameInput.value.trim(),
         rut: rutInput.value.trim(),
         phone: phoneInput.value.trim(),
+        email: emailInput.value.trim(),
         address: addrInput.value.trim()
     };
 
@@ -1303,6 +1345,7 @@ function addClient() {
     nameInput.value = '';
     rutInput.value = '';
     phoneInput.value = '';
+    emailInput.value = '';
     addrInput.value = '';
 }
 
@@ -1503,4 +1546,229 @@ function exportAllHistoryToExcel() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Historial Global");
     XLSX.writeFile(workbook, `Reporte_Historial_ProTarifas_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+function exportHistoryToPdf() {
+    const filtered = budgetHistory.filter(h => {
+        const matchesClient = h.client.toLowerCase().includes(historySearchQuery);
+        const matchesFrom = !historyStartDate || h.date >= historyStartDate;
+        const matchesTo = !historyEndDate || h.date <= historyEndDate;
+        return matchesClient && matchesFrom && matchesTo;
+    });
+
+    if (filtered.length === 0) {
+        alert("No hay registros en la vista actual para exportar.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+
+    // Header Corporativo del Reporte
+    doc.setFillColor(31, 41, 55); // Gris oscuro professional
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    if (companyInfo.logo) {
+        try { doc.addImage(companyInfo.logo, 'PNG', 14, 8, 24, 24); } catch (e) {}
+    }
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("REPORTE DE COTIZACIONES", 45, 20);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const periodStr = (historyStartDate || historyEndDate) 
+        ? `Periodo: ${historyStartDate || 'Inicio'} al ${historyEndDate || 'Hoy'}`
+        : "Todos los registros guardados";
+    doc.text(periodStr, 45, 28);
+    doc.text(`Generado por: ${companyInfo.name || 'ProTarifas'} | Fecha: ${new Date().toLocaleDateString()}`, 45, 34);
+
+    // Tabla de Datos
+    const tableBody = filtered.map(h => [
+        h.date,
+        h.client,
+        (h.status || 'Enviado').toUpperCase(),
+        formatCurrency(h.total)
+    ]);
+
+    const globalTotalSum = filtered.reduce((acc, h) => acc + h.total, 0);
+
+    doc.autoTable({
+        startY: 50,
+        head: [['Fecha', 'Cliente / Proyecto', 'Estado', 'Monto Total']],
+        body: tableBody,
+        theme: 'striped',
+        headStyles: { fillColor: [16, 185, 129] }, // Verde ProTarifas
+        foot: [['', '', 'TOTAL ACUMULADO:', formatCurrency(globalTotalSum)]],
+        footStyles: { fillColor: [243, 244, 246], textColor: [31, 41, 55], fontStyle: 'bold', fontSize: 10 },
+        columnStyles: {
+            3: { halign: 'right' },
+            2: { halign: 'center' }
+        }
+    });
+
+    doc.save(`Reporte_Historial_PDF_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+// v4.0 Settings Persistence
+function saveTaxSettings() { localStorage.setItem('protarifas_tax_name', taxName); localStorage.setItem('protarifas_tax_percent', taxPercent); }
+function loadTaxSettings() {
+    taxName = localStorage.getItem('protarifas_tax_name') || "IVA";
+    taxPercent = parseFloat(localStorage.getItem('protarifas_tax_percent')) || 19;
+    document.getElementById('tax-name').value = taxName;
+    document.getElementById('tax-percent').value = taxPercent;
+}
+function saveLegalNotes() { localStorage.setItem('protarifas_legal_notes', legalNotes); }
+function loadLegalNotes() {
+    legalNotes = localStorage.getItem('protarifas_legal_notes') || "Válido por 15 días. Pago al contado.";
+    document.getElementById('legal-notes').value = legalNotes;
+}
+
+// v4.0 Logic Modules
+function importRulesFromExcel(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const sheetName = workbook.SheetNames[0];
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        
+        rows.forEach(row => {
+            const rule = {
+                id: Date.now() + Math.random(),
+                service: row['Servicio'] || '',
+                species: row['Especie'] || '',
+                description: row['Variedad'] || row['Descripcion'] || '',
+                price: parseFloat(row['Precio'] || 0)
+            };
+            if (rule.service && rule.price > 0) tariffRules.push(rule);
+        });
+        saveRules();
+        alert(`Se han importado ${rows.length} reglas de precios.`);
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function checkExpirations() {
+    const today = new Date();
+    let updated = false;
+    budgetHistory.forEach(h => {
+        if (h.status === 'enviado') {
+            const budgetDate = new Date(h.date);
+            const diffDays = Math.floor((today - budgetDate) / (1000 * 60 * 60 * 24));
+            if (diffDays > 15) {
+                h.status = 'vencido';
+                updated = true;
+            }
+        }
+    });
+    if (updated) localStorage.setItem('protarifas_history', JSON.stringify(budgetHistory));
+}
+
+function sendBudgetByEmail(entry) {
+    if (!entry.items || entry.items.length === 0) {
+        alert("Agregue servicios al presupuesto para enviar por correo.");
+        return;
+    }
+
+    const client = clients.find(c => c.name.toLowerCase() === entry.client.toLowerCase());
+    let email = client ? client.email : '';
+    
+    if (!email) {
+        email = prompt(`No se encontró un correo para "${entry.client}". Ingrese el correo del destinatario:`, "");
+        if (!email) return; // Cancelado
+    }
+
+    const subject = encodeURIComponent(`Cotización de Servicios - ${companyInfo.name || 'ProTarifas'}`);
+    const body = encodeURIComponent(`Hola ${entry.client},\n\nAdjunto enviamos la cotización solicitada con fecha ${entry.date}.\nTotal: ${formatCurrency(entry.total)}\n\nPor favor, revise el archivo PDF adjunto para más detalles (debe generarlo antes para enviarlo).\n\nAtentamente,\n${companyInfo.name || 'El equipo'}`);
+    
+    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+}
+
+function sendBudgetByEmailFromHistory(id) {
+    const entry = budgetHistory.find(h => h.id === id);
+    if (entry) sendBudgetByEmail(entry);
+}
+
+window.sendBudgetByEmailFromHistory = sendBudgetByEmailFromHistory;
+
+// ----------------------------------------------------
+// FUNCIONES AUXILIARES (Utilidades)
+// ----------------------------------------------------
+
+function formatCurrency(val) {
+    if (val === undefined || val === null || isNaN(val)) return "$ 0";
+    if (baseCurrency === "USD") {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+    }
+    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(Math.round(val));
+}
+
+function formatUSD(val) {
+    if (val === undefined || val === null || isNaN(val)) return "U$ 0,00";
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+}
+
+function formatPrice(val) {
+    if (val === undefined || val === null || isNaN(val)) return "0";
+    return new Intl.NumberFormat('es-CL').format(val);
+}
+
+function formatAltCurrency(val) {
+    if (baseCurrency === "USD") {
+        // Si base es USD, alt es CLP
+        return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(Math.round(val));
+    }
+    // Si base es CLP, alt es USD
+    return formatUSD(val);
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('es-CL');
+}
+
+function createSelectOptions(optionsArray, selectedValue = "") {
+    if (!optionsArray) return '';
+    return optionsArray.map(opt => `<option value="${opt}" ${opt === selectedValue ? 'selected' : ''}>${opt}</option>`).join('');
+}
+
+function saveTariffRules() {
+    localStorage.setItem('protarifas_rules', JSON.stringify(tariffRules));
+}
+
+function saveRules() { saveTariffRules(); }
+
+function saveClients() {
+    localStorage.setItem('protarifas_clients', JSON.stringify(clients));
+}
+
+function saveTaxSettings() {
+    localStorage.setItem('protarifas_tax_name', taxName);
+    localStorage.setItem('protarifas_tax_percent', taxPercent);
+}
+
+function saveLegalNotes() {
+    localStorage.setItem('protarifas_legal_notes', legalNotes);
+}
+
+function loadTaxSettings() {
+    taxName = localStorage.getItem('protarifas_tax_name') || "IVA";
+    taxPercent = parseFloat(localStorage.getItem('protarifas_tax_percent')) || 19;
+    const nameEl = document.getElementById('tax-name');
+    const percentEl = document.getElementById('tax-percent');
+    if (nameEl) nameEl.value = taxName;
+    if (percentEl) percentEl.value = taxPercent;
+}
+
+function loadLegalNotes() {
+    legalNotes = localStorage.getItem('protarifas_legal_notes') || "Válido por 15 días. Pago al contado.";
+    const notesEl = document.getElementById('legal-notes');
+    if (notesEl) notesEl.value = legalNotes;
 }

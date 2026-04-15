@@ -99,7 +99,7 @@
                         <button class="btn btn-outline" id="btn-export-excel">
                             <i class="ph ph-file-xls"></i> Excel
                         </button>
-                        <button class="btn btn-primary" id="btn-export-pdf">
+                        <button class="btn btn-outline" id="btn-export-pdf">
                             <i class="ph ph-file-pdf"></i> PDF
                         </button>
                     </div>
@@ -166,7 +166,7 @@
                             <span class="total-amount" id="subtotal-amount">$0</span>
                         </div>
                         <div class="grand-total-box">
-                            <span class="total-label">IVA (19%)</span>
+                            <span class="total-label" id="tax-label">IVA (19%)</span>
                             <span class="total-amount" id="tax-amount">$0</span>
                         </div>
                         <div class="grand-total-box highlight">
@@ -234,6 +234,18 @@
                                         <input type="file" id="input-signature" accept="image/*" class="form-control">
                                     </div>
                                 </div>
+                                <div class="form-group">
+                                    <label>Nombre del Impuesto (IVA, TAX, IGV)</label>
+                                    <input type="text" id="tax-name" class="form-control" placeholder="Ej. IVA">
+                                </div>
+                                <div class="form-group">
+                                    <label>Porcentaje de Impuesto (%)</label>
+                                    <input type="number" id="tax-percent" class="form-control" placeholder="Ej. 19" min="0" step="0.1">
+                                </div>
+                                <div class="form-group" style="grid-column: 1 / -1;">
+                                    <label>Términos, Condiciones y Notas Legales (Pie de PDF)</label>
+                                    <textarea id="legal-notes" class="form-control" rows="3" placeholder="Ej. Validez 15 días. Pago transferido a cuenta..."></textarea>
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -248,7 +260,8 @@
                                 <div class="form-group"><label>Nombre del Cliente</label><input type="text" id="new-client-name" class="form-control" placeholder="Nombre completo"></div>
                                 <div class="form-group"><label>RUT Cliente</label><input type="text" id="new-client-rut" class="form-control" placeholder="11.222.333-4"></div>
                                 <div class="form-group"><label>Teléfono</label><input type="text" id="new-client-phone" class="form-control" placeholder="+56 9 ..."></div>
-                                <div class="form-group"><label>Dirección</label><input type="text" id="new-client-address" class="form-control" placeholder="Calle #123, Ciudad"></div>
+                                <div class="form-group"><label>Email</label><input type="email" id="new-client-email" class="form-control" placeholder="cliente@empresa.com"></div>
+                                <div class="form-group" style="grid-column: span 2;"><label>Dirección</label><input type="text" id="new-client-address" class="form-control" placeholder="Calle #123, Ciudad"></div>
                             </div>
                             <div style="margin-top: 16px; text-align: right;">
                                 <button class="btn btn-primary" id="btn-add-client">
@@ -262,7 +275,9 @@
                                         <tr>
                                             <th>Cliente</th>
                                             <th>RUT</th>
-                                            <th>Contacto / Dirección</th>
+                                            <th>Email</th>
+                                            <th>Teléfono</th>
+                                            <th>Dirección</th>
                                             <th class="text-center">Acciones</th>
                                         </tr>
                                     </thead>
@@ -338,9 +353,15 @@
                     <section class="card">
                         <div class="card-header">
                             <h3>Reglas Tarifarias (Auto-completado)</h3>
-                            <button class="btn btn-primary btn-sm" id="btn-add-rule">
-                                <i class="ph ph-plus"></i> Nueva Regla
-                            </button>
+                            <div style="display: flex; gap: 10px;">
+                                <label class="btn btn-outline btn-sm" style="margin: 0; cursor: pointer;">
+                                    <i class="ph ph-file-arrow-up"></i> Importar Excel
+                                    <input type="file" id="input-import-rules" accept=".xlsx, .xls" style="display: none;">
+                                </label>
+                                <button class="btn btn-primary btn-sm" id="btn-add-rule">
+                                    <i class="ph ph-plus"></i> Nueva Regla
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body pl-0 pr-0">
                             <div class="table-responsive">
@@ -394,7 +415,10 @@
                     </div>
                     <div class="header-actions">
                         <button class="btn btn-primary" id="btn-export-all-history">
-                            <i class="ph ph-file-xls"></i> Exportar Todo a Excel
+                            <i class="ph ph-file-xls"></i> Excel Global
+                        </button>
+                        <button class="btn btn-outline" id="btn-export-history-pdf" style="border-color: #ef4444; color: #ef4444;">
+                            <i class="ph ph-file-pdf"></i> Reporte PDF
                         </button>
                     </div>
                 </header>
@@ -405,6 +429,12 @@
                             <div style="flex: 1; min-width: 200px; display: flex; align-items: center; gap: 10px;">
                                 <i class="ph ph-magnifying-glass" style="color: var(--color-text-muted);"></i>
                                 <input type="text" id="history-search" class="form-control" placeholder="Buscar por cliente..." list="client-datalist">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <label style="font-size: 0.8rem; color: var(--color-text-muted);">Desde:</label>
+                                <input type="date" id="history-date-from" class="form-control" style="width: auto; height: 35px; padding: 4px 8px;">
+                                <label style="font-size: 0.8rem; color: var(--color-text-muted); margin-left: 8px;">Hasta:</label>
+                                <input type="date" id="history-date-to" class="form-control" style="width: auto; height: 35px; padding: 4px 8px;">
                             </div>
                             <button class="btn btn-outline btn-sm" id="btn-clear-history">
                                 <i class="ph ph-trash"></i> Borrar Todo
