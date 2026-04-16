@@ -3,207 +3,477 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Acceso QR | Estudiantes</title>
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Iconos integrados -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Estilos -->
-    <link rel="stylesheet" href="./styles.css">
+    <title>Generador de Presupuesto Tarifario</title>
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Librerías Externas -->
+    <!-- jsPDF para Exportar a PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- jsPDF AutoTable para tablas en PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <!-- SheetJS (XLSX) para excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Chart.js para Dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Phosphor Icons para iconos bonitos -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
-<body>
+<body class="light-mode" id="app-body">
     <div class="app-container">
-        <!-- Sidebar Superior / Header -->
-        <header class="app-header">
-            <div class="header-content">
-                <div class="logo">
-                    <i class="fa-solid fa-qrcode"></i> Sistema de Acceso QR
-                </div>
-                
-                <nav class="app-nav">
-                    <button id="tab-scanner" class="tab-btn active"><i class="fa-solid fa-camera"></i> Control Escáner</button>
-                    <button id="tab-generator" class="tab-btn"><i class="fa-solid fa-wand-magic-sparkles"></i> Generador QRs</button>
-                </nav>
+        <!-- Barra Lateral -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="ph ph-briefcase logo-icon"></i>
+                <h2>Presupuestos</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item" id="nav-dashboard">
+                    <i class="ph ph-chart-line-up"></i>
+                    <span>Panel de Control</span>
+                </a>
+                <a href="#" class="nav-item active" id="nav-budget">
+                    <i class="ph ph-file-text"></i>
+                    <span>Crear Presupuesto</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-config">
+                    <i class="ph ph-gear"></i>
+                    <span>Configuración Tarifas</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-history">
+                    <i class="ph ph-clock-counter-clockwise"></i>
+                    <span>Historial</span>
+                </a>
+            </nav>
+        </aside>
 
-                <div class="header-info">
-                    <i class="fa-regular fa-clock"></i> <span id="current-time">00:00:00</span>
+        <!-- Contenido Principal -->
+        <main class="main-content">
+            <!-- VISTA: Dashboard -->
+            <div id="view-dashboard" style="display: none;">
+                <header class="top-header">
+                    <div>
+                        <h1 class="page-title">Panel de Control</h1>
+                        <p class="page-subtitle">Análisis estadístico de sus cotizaciones y clientes.</p>
+                    </div>
+                </header>
+                <div class="dashboard-grid">
+                    <section class="card stat-card">
+                        <div class="card-header"><h3>Resumen de Ventas (Mensual)</h3></div>
+                        <div class="card-body"><canvas id="salesChart"></canvas></div>
+                    </section>
+                    <section class="card stat-card">
+                        <div class="card-header"><h3>Top 5 Clientes</h3></div>
+                        <div class="card-body"><canvas id="clientsChart"></canvas></div>
+                    </section>
+                    <section class="card stat-card">
+                        <div class="card-header"><h3>Distribución de Servicios</h3></div>
+                        <div class="card-body"><canvas id="servicesChart"></canvas></div>
+                    </section>
                 </div>
             </div>
-        </header>
 
-        <main class="main-content">
-            <!-- VISTA 1: ESCANER Y ACCESO -->
-            <div id="view-scanner" class="view-section active">
-                <div class="layout-grid">
-                    <!-- Zona de Escaneo -->
-                    <div class="scanner-section">
-                        <div class="control-panel">
-                            <h2>Registrar Asistencia</h2>
-                            <p>Seleccione el área y el sentido del registro antes de escanear.</p>
-                            
-                            <div class="area-selector" style="margin-bottom: 1rem;">
-                                <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.4rem; color:var(--text-main);">Área / Ubicación</label>
-                                <div style="display:flex; gap:0.5rem;">
-                                    <select id="area-select" style="flex:1; padding:0.75rem; border:1px solid var(--border); border-radius:6px; background:var(--surface); font-size:1rem; outline:none; color:var(--text-main);"></select>
-                                    <button id="btn-manage-areas" class="btn-secondary" style="padding:0.75rem 1rem; border:1px solid var(--border); background:var(--bg-color); border-radius:6px; cursor:pointer; color:var(--text-muted);" title="Configurar Áreas"><i class="fa-solid fa-cog"></i></button>
-                                </div>
-                            </div>
-
-                            <div class="toggle-buttons">
-                                <button id="btn-entrada" class="btn-mode active">
-                                    <i class="fa-solid fa-arrow-right-to-bracket"></i> ENTRADA
-                                </button>
-                                <button id="btn-salida" class="btn-mode">
-                                    <i class="fa-solid fa-arrow-right-from-bracket"></i> SALIDA
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="scanner-container">
-                            <div id="reader"></div>
-                            <div class="scan-overlay">
-                                <p id="scanner-status">Preparando cámara...</p>
-                            </div>
-                        </div>
-
-                        <div id="last-scan-result" class="scan-result hidden">
-                            <div class="result-icon success" id="scan-feedback-icon"><i class="fa-solid fa-circle-check"></i></div>
-                            <div class="result-data">
-                                <h3 id="result-name">Nombre Rut</h3>
-                                <p id="result-time">Entrada a las 08:00 AM</p>
-                            </div>
-                        </div>
+            <!-- VISTA: Crear Presupuesto -->
+            <div id="view-budget">
+                <header class="top-header">
+                    <div>
+                        <h1 class="page-title">Nuevo Presupuesto Tarifario</h1>
+                        <p class="page-subtitle">Configure los servicios y tarifas para exportar su presupuesto.</p>
                     </div>
-
-                    <!-- Zona de Historial -->
-                    <div class="history-section">
-                        <div class="history-header">
-                            <h2>Registros Recientes (Hoy)</h2>
-                            <div class="export-actions">
-                                <button id="export-excel" class="btn-export btn-excel">
-                                    <i class="fa-solid fa-file-excel"></i> Excel
-                                </button>
-                                <button id="export-pdf" class="btn-export btn-pdf">
-                                    <i class="fa-solid fa-file-pdf"></i> PDF
-                                </button>
-                                <button id="clear-records" class="btn-export btn-clear">
-                                    <i class="fa-solid fa-trash-can"></i> Limpiar
-                                </button>
-                            </div>
+                    <div class="header-main-actions">
+                        <select class="form-control currency-selector" id="base-currency-select" title="Seleccionar Moneda Base">
+                            <option value="CLP">CLP (Pesos)</option>
+                            <option value="USD">USD (Dólares)</option>
+                        </select>
+                        <div class="exchange-rate-widget" id="usd-rate-container" title="Actualizado desde mindicador.cl">
+                            <i class="ph ph-currency-dollar"></i>
+                            <span id="usd-rate-value">Cargando...</span>
                         </div>
+                        <button class="btn-mode-toggle" id="btn-theme-toggle" title="Cambiar Tema">
+                            <i class="ph ph-moon"></i>
+                        </button>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-outline" id="btn-new-budget">
+                            <i class="ph ph-plus"></i> Nuevo
+                        </button>
+                        <button class="btn btn-outline" id="btn-export-excel">
+                            <i class="ph ph-file-xls"></i> Excel
+                        </button>
+                        <button class="btn btn-outline" id="btn-export-pdf">
+                            <i class="ph ph-file-pdf"></i> PDF
+                        </button>
+                    </div>
+                </header>
 
-                        <div class="table-container">
-                            <table id="records-table">
+                <div class="content-grid">
+                <!-- Zona de Formulario -->
+                <section class="form-section card">
+                    <div class="card-header">
+                        <h3>Detalle de Servicios</h3>
+                        <button class="btn btn-icon btn-sm" id="btn-add-row" title="Agregar Servicio">
+                            <i class="ph ph-plus"></i> Añadir Fila
+                        </button>
+                    </div>
+                    <div class="card-body pl-0 pr-0">
+                        <div class="table-responsive">
+                            <table class="services-table" id="budget-table">
                                 <thead>
                                     <tr>
-                                        <th>Estudiante / RUT</th>
-                                        <th>Área</th>
-                                        <th>Sentido</th>
-                                        <th>Hora</th>
-                                        <th>Fecha</th>
-                                        <th>Acción</th>
+                                        <th>Servicio</th>
+                                        <th>Especie</th>
+                                        <th>Descripción / Variedad</th>
+                                        <th>Cantidad</th>
+                                        <th>Precio Unit ($)</th>
+                                        <th>Total ($)</th>
+                                        <th class="text-center">Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody id="records-body">
-                                    <!-- Los registros dinámicos -->
+                                <tbody id="budget-tbody">
+                                    <!-- Las filas se insertarán dinámicamente con JS -->
                                 </tbody>
                             </table>
                         </div>
                     </div>
+                    <div class="card-footer form-footer">
+                         <div class="form-group flex-1">
+                                <label for="client-name">Nombre del Cliente / Proyecto</label>
+                                <input type="text" id="client-name" class="form-control" placeholder="Ej. Agrícola Los Nogales SPA" list="client-datalist">
+                                <datalist id="client-datalist"></datalist>
+                         </div>
+                         <div class="form-group">
+                                <label for="budget-date">Fecha de Emisión</label>
+                                <input type="date" id="budget-date" class="form-control">
+                         </div>
+                    </div>
+                </section>
+
+                <!-- Zona de Resumen o Totales -->
+                <section class="summary-section card">
+                    <div class="card-header">
+                        <h3>Resumen del Presupuesto</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="summary-content" class="summary-content">
+                            <!-- El resumen agrupado por servicios se pintará aquí -->
+                            <div class="empty-state">
+                                <i class="ph ph-tray"></i>
+                                <p>Agregue servicios para ver el resumen interactivo.</p>
+                            </div>
+                        </div>
+                        <hr class="divider">
+                        <div class="grand-total-box">
+                            <span class="total-label">Subtotal</span>
+                            <span class="total-amount" id="subtotal-amount">$0</span>
+                        </div>
+                        <div class="grand-total-box">
+                            <span class="total-label" id="tax-label">IVA (19%)</span>
+                            <span class="total-amount" id="tax-amount">$0</span>
+                        </div>
+                        <div class="grand-total-box highlight">
+                            <span class="total-label" id="grand-total-label">Total a Pagar</span>
+                            <span class="total-amount grand-total" id="grand-total-amount">$0</span>
+                        </div>
+                        <div class="grand-total-box alt-currency">
+                            <span class="total-label">Equivalente Aproximado (USD)</span>
+                            <span class="total-amount" id="total-usd-amount">U$ 0,00</span>
+                        </div>
+                    </div>
+                </section>
                 </div>
             </div>
 
-            <!-- VISTA 2: GENERADOR DE QRS -->
-            <div id="view-generator" class="view-section">
-                <div class="layout-grid">
-                    <!-- Formulario -->
-                    <div class="generator-form-section">
-                        <h2>Crear Nuevo Código QR</h2>
-                        <p>Ingrese los datos que quedarán guardados en el código de este estudiante.</p>
-                        
-                        <div class="form-group">
-                            <label>Nombre Completo</label>
-                            <input type="text" id="qr-gen-name" placeholder="Ej. Juan Pérez González" autocomplete="off">
-                        </div>
-                        <div class="form-group">
-                            <label>RUT / Identificador</label>
-                            <input type="text" id="qr-gen-rut" placeholder="Ej. 12.345.678-9" autocomplete="off">
-                        </div>
-                        <div class="form-group">
-                            <label>Año que cursa (Curso)</label>
-                            <input type="text" id="qr-gen-year" placeholder="Ej. 4to Medio, 8vo Básico" autocomplete="off">
-                        </div>
-                        <div class="form-group">
-                            <label>Fotografía del Rostro (Opcional)</label>
-                            <input type="file" id="qr-gen-photo" accept="image/*" class="file-input" capture="environment">
-                        </div>
-                        <button id="btn-generate-qr" class="btn-primary">
-                            <i class="fa-solid fa-qrcode"></i> Generar y Guardar
+            <!-- Zona de Configuración de Tarifas -->
+            <div id="view-config" style="display: none;">
+                <header class="top-header">
+                    <div>
+                        <h1 class="page-title">Configuración de Tarifario</h1>
+                        <p class="page-subtitle">Defina precios y descripciones por defecto. Se guardarán en su navegador automáticamente.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-outline" id="btn-clear-tariffs">
+                            <i class="ph ph-trash"></i> Restablecer
                         </button>
                     </div>
+                </header>
 
-                    <!-- Lista Guardada -->
-                    <div class="qrs-saved-section">
-                        <div class="history-header">
-                            <h2>Directorio de QR Creados</h2>
-                            <div class="export-actions">
-                                <button id="btn-print-qrs" class="btn-export">
-                                    <i class="fa-solid fa-print"></i> Imprimir Todo
+                <div style="padding: 32px; max-width: 1200px; margin: 0 auto;">
+                    <!-- Config de Empresa / Branding -->
+                    <section class="card mb-24">
+                        <div class="card-header">
+                            <h3>Personalización de Marca (Branding)</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="branding-grid">
+                                <div class="form-group">
+                                    <label>Logo de la Empresa</label>
+                                    <div class="logo-upload-container">
+                                        <div id="logo-preview" class="logo-preview">
+                                            <i class="ph ph-image"></i>
+                                        </div>
+                                        <input type="file" id="input-logo" accept="image/*" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Nombre de la Empresa</label>
+                                    <input type="text" id="company-name" class="form-control" placeholder="Ej. Mi Empresa SPA">
+                                </div>
+                                <div class="form-group">
+                                    <label>RUT / Tax ID</label>
+                                    <input type="text" id="company-rut" class="form-control" placeholder="Ej. 76.123.456-7">
+                                </div>
+                                <div class="form-group">
+                                    <label>Dirección / Contacto</label>
+                                    <input type="text" id="company-contact" class="form-control" placeholder="Ej. Av. Principal 123, Ciudad">
+                                </div>
+                                <div class="form-group">
+                                    <label>Firma Digital / Timbre</label>
+                                    <div class="logo-upload-container">
+                                        <div id="signature-preview" class="logo-preview">
+                                            <i class="ph ph-signature"></i>
+                                        </div>
+                                        <input type="file" id="input-signature" accept="image/*" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Nombre del Impuesto (IVA, TAX, IGV)</label>
+                                    <input type="text" id="tax-name" class="form-control" placeholder="Ej. IVA">
+                                </div>
+                                <div class="form-group">
+                                    <label>Porcentaje de Impuesto (%)</label>
+                                    <input type="number" id="tax-percent" class="form-control" placeholder="Ej. 19" min="0" step="0.1">
+                                </div>
+                                <div class="form-group" style="grid-column: 1 / -1;">
+                                    <label>Términos, Condiciones y Notas Legales (Pie de PDF)</label>
+                                    <textarea id="legal-notes" class="form-control" rows="3" placeholder="Ej. Validez 15 días. Pago transferido a cuenta..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Directorio de Clientes -->
+                    <section class="card mb-24">
+                        <div class="card-header">
+                            <h3>Directorio de Clientes</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="branding-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                                <div class="form-group"><label>Nombre del Cliente</label><input type="text" id="new-client-name" class="form-control" placeholder="Nombre completo"></div>
+                                <div class="form-group"><label>RUT Cliente</label><input type="text" id="new-client-rut" class="form-control" placeholder="11.222.333-4"></div>
+                                <div class="form-group"><label>Teléfono</label><input type="text" id="new-client-phone" class="form-control" placeholder="+56 9 ..."></div>
+                                <div class="form-group"><label>Email</label><input type="email" id="new-client-email" class="form-control" placeholder="cliente@empresa.com"></div>
+                                <div class="form-group" style="grid-column: span 2;"><label>Dirección</label><input type="text" id="new-client-address" class="form-control" placeholder="Calle #123, Ciudad"></div>
+                            </div>
+                            <div style="margin-top: 16px; text-align: right;">
+                                <button class="btn btn-primary" id="btn-add-client">
+                                    <i class="ph ph-plus-circle"></i> Guardar Cliente en Directorio
                                 </button>
-                                <button id="clear-qrs" class="btn-export btn-clear">
-                                    <i class="fa-solid fa-trash-can"></i> Limpiar
+                            </div>
+                            <hr class="divider">
+                            <div class="table-responsive">
+                                <table class="services-table" id="clients-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Cliente</th>
+                                            <th>RUT</th>
+                                            <th>Email</th>
+                                            <th>Teléfono</th>
+                                            <th>Dirección</th>
+                                            <th class="text-center">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="clients-tbody">
+                                        <!-- Clientes dinámicos -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 24px;">
+                        <!-- Config de Servicios -->
+                        <section class="card">
+                            <div class="card-header" style="flex-wrap: wrap; gap: 8px;">
+                                <h3 style="width: 100%;">Tipos de Servicios</h3>
+                                <div style="display: flex; gap: 8px; width: 100%;">
+                                    <input type="text" id="new-service-input" class="form-control" placeholder="Nuevo Servicio..." style="padding: 6px 8px; flex: 1;">
+                                    <button class="btn btn-primary btn-sm" id="btn-add-service">
+                                        <i class="ph ph-plus"></i> Añadir
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body pl-0 pr-0">
+                                <table class="services-table" id="services-config-table">
+                                    <tbody id="services-tbody">
+                                        <!-- Filas dinámicas -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <!-- Config de Especies -->
+                        <section class="card">
+                            <div class="card-header" style="flex-wrap: wrap; gap: 8px;">
+                                <h3 style="width: 100%;">Tipos de Especies</h3>
+                                <div style="display: flex; gap: 8px; width: 100%;">
+                                    <input type="text" id="new-species-input" class="form-control" placeholder="Nueva Especie..." style="padding: 6px 8px; flex: 1;">
+                                    <button class="btn btn-primary btn-sm" id="btn-add-species">
+                                        <i class="ph ph-plus"></i> Añadir
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body pl-0 pr-0">
+                                <table class="services-table" id="species-config-table">
+                                    <tbody id="species-tbody">
+                                        <!-- Filas dinámicas -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <!-- Config de Descripciones -->
+                        <section class="card">
+                            <div class="card-header" style="flex-wrap: wrap; gap: 8px;">
+                                <h3 style="width: 100%;">Descripciones / Variedades</h3>
+                                <div style="display: flex; gap: 8px; width: 100%;">
+                                    <input type="text" id="new-desc-input" class="form-control" placeholder="Nueva Desc..." style="padding: 6px 8px; flex: 1;">
+                                    <button class="btn btn-primary btn-sm" id="btn-add-desc">
+                                        <i class="ph ph-plus"></i> Añadir
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body pl-0 pr-0">
+                                <table class="services-table" id="desc-config-table">
+                                    <tbody id="desc-tbody">
+                                        <!-- Filas dinámicas -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+
+                    <section class="card">
+                        <div class="card-header">
+                            <h3>Reglas Tarifarias (Auto-completado)</h3>
+                            <div style="display: flex; gap: 10px;">
+                                <label class="btn btn-outline btn-sm" style="margin: 0; cursor: pointer;">
+                                    <i class="ph ph-file-arrow-up"></i> Importar Excel
+                                    <input type="file" id="input-import-rules" accept=".xlsx, .xls" style="display: none;">
+                                </label>
+                                <button class="btn btn-primary btn-sm" id="btn-add-rule">
+                                    <i class="ph ph-plus"></i> Nueva Regla
                                 </button>
                             </div>
                         </div>
-                        <p class="subtitle">Encuentre aquí los códigos de sus estudiantes para visualizar o imprimir.</p>
+                        <div class="card-body pl-0 pr-0">
+                            <div class="table-responsive">
+                                <table class="services-table" id="tariff-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Servicio</th>
+                                            <th>Especie</th>
+                                            <th>Descripción Automática</th>
+                                            <th>Precio Unit ($)</th>
+                                            <th class="text-center">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tariff-tbody">
+                                        <!-- Filas de tarifas dinámicos -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
 
-                        <div class="search-bar-container">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="search-qr-input" placeholder="Buscar por Nombre, RUT o Curso..." autocomplete="off">
+                    <!-- Copia de Seguridad -->
+                    <section class="card mb-24">
+                        <div class="card-header">
+                            <h3>Seguridad y Portabilidad</h3>
                         </div>
+                        <div class="card-body">
+                            <p style="font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 16px;">
+                                Descargue una copia de seguridad de toda su configuración (clientes, reglas, branding) o impórtela desde un archivo.
+                            </p>
+                            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                                <button class="btn btn-outline" id="btn-export-backup">
+                                    <i class="ph ph-download-simple"></i> Exportar Configuración
+                                </button>
+                                <label class="btn btn-outline" style="cursor: pointer;">
+                                    <i class="ph ph-upload-simple"></i> Importar Configuración
+                                    <input type="file" id="input-import-backup" accept=".json" style="display: none;">
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
 
-                        <div id="qrs-container" class="qrs-list">
-                            <!-- Los Qrs dinámicos (Paginados) -->
-                        </div>
-                        
-                        <div class="pagination-controls" id="qr-pagination">
-                            <!-- JS Paginacion -->
-                        </div>
+            <!-- Zona de Historial -->
+            <div id="view-history" style="display: none;">
+                <header class="top-header">
+                    <div>
+                        <h1 class="page-title">Historial de Presupuestos</h1>
+                        <p class="page-subtitle">Consulte y gestione sus cotizaciones guardadas.</p>
                     </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" id="btn-export-all-history">
+                            <i class="ph ph-file-xls"></i> Excel Global
+                        </button>
+                        <button class="btn btn-outline" id="btn-export-history-pdf" style="border-color: #ef4444; color: #ef4444;">
+                            <i class="ph ph-file-pdf"></i> Reporte PDF
+                        </button>
+                    </div>
+                </header>
+
+                <div style="padding: 32px; max-width: 1200px; margin: 0 auto;">
+                    <section class="card">
+                        <div class="card-header" style="flex-wrap: wrap; gap: 16px;">
+                            <div style="flex: 1; min-width: 200px; display: flex; align-items: center; gap: 10px;">
+                                <i class="ph ph-magnifying-glass" style="color: var(--color-text-muted);"></i>
+                                <input type="text" id="history-search" class="form-control" placeholder="Buscar por cliente..." list="client-datalist">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <label style="font-size: 0.8rem; color: var(--color-text-muted);">Desde:</label>
+                                <input type="date" id="history-date-from" class="form-control" style="width: auto; height: 35px; padding: 4px 8px;">
+                                <label style="font-size: 0.8rem; color: var(--color-text-muted); margin-left: 8px;">Hasta:</label>
+                                <input type="date" id="history-date-to" class="form-control" style="width: auto; height: 35px; padding: 4px 8px;">
+                            </div>
+                            <button class="btn btn-outline btn-sm" id="btn-clear-history">
+                                <i class="ph ph-trash"></i> Borrar Todo
+                            </button>
+                        </div>
+                        <div class="card-body pl-0 pr-0">
+                            <div class="table-responsive">
+                                <table class="services-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Cliente / Proyecto</th>
+                                            <th>Total</th>
+                                            <th class="text-center">Estado</th>
+                                            <th class="text-center">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="history-tbody">
+                                        <!-- Filas dinámicas -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card-footer" id="history-pagination" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--color-border); padding: 12px 16px;">
+                            <button class="btn btn-outline btn-sm" id="btn-prev-page">
+                                <i class="ph ph-caret-left"></i> Anterior
+                            </button>
+                            <span id="page-indicator" style="font-size: 0.875rem; color: var(--color-text-muted); font-weight: 500;">Página 1 de 1</span>
+                            <button class="btn btn-outline btn-sm" id="btn-next-page">
+                                Siguiente <i class="ph ph-caret-right"></i>
+                            </button>
+                        </div>
+                    </section>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Modal Áreas -->
-    <div id="modal-areas" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Gestión de Áreas</h2>
-                <button id="close-modal-areas" class="close-btn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p style="margin-bottom:1rem; font-size:0.9rem; color:var(--text-muted);">Agrega o elimina áreas (ej: Biblioteca, Comedor, Portería). La primera área será la predeterminada.</p>
-                <div class="form-group" style="flex-direction:row; gap:0.5rem; margin-bottom:1.5rem; align-items:center;">
-                    <input type="text" id="new-area-input" placeholder="Nueva área..." style="flex:1;">
-                    <button id="btn-add-area" class="btn-primary" style="margin-top:0;">Añadir</button>
-                </div>
-                <ul id="areas-list" class="areas-list"></ul>
-            </div>
-        </div>
-    </div>
-
-    <div id="print-container" class="print-only"></div>
-
-    <!-- Carga de Librerias -->
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-    <!-- Qrious - Libreria Ligera para generar QR -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
-    
-    <!-- Lógica y Control -->
-    <script src="./app.js"></script>
+    <!-- Scripts de la app -->
+    <script src="app.js"></script>
 </body>
 </html>
